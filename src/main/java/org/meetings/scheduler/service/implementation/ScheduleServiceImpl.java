@@ -22,8 +22,36 @@ public class ScheduleServiceImpl implements ScheduleService<PersonSchedulesDTO, 
     private PersonScheduleRepository personScheduleRepository;
     @Override
     public boolean insertSchedule(PersonSchedulesDTO schedule) {
-        PersonSchedule person = personScheduleRepository.save(PersonSchedule.PersonScheduleBuilder.buildFromPersonScheduleDTO(schedule));
+        Optional<PersonSchedule> existPerson = personScheduleRepository.findById(schedule.getName());
+
+        if(existPerson.isPresent()){
+            updateSchedule(
+                    existPerson.get(),
+                    castDTOToDomain(schedule).getDates()
+            );
+            return true;
+        }
+
+        return newPerson(schedule);
+     }
+
+    private boolean newPerson(PersonSchedulesDTO schedule){
+        PersonSchedule person = personScheduleRepository.save(castDTOToDomain(schedule));
         return person.getName().equalsIgnoreCase(schedule.getName());
+    }
+
+    private PersonSchedule castDTOToDomain(PersonSchedulesDTO schedule) {
+        return PersonSchedule.PersonScheduleBuilder.buildFromPersonScheduleDTO(schedule);
+    }
+
+    private void updateSchedule(PersonSchedule person, Set<Dates> newSchedule){
+        Map<String,Dates> currentSchedule = getPersonDatesAsMap(person);
+        newSchedule.forEach(day->{
+            if(currentSchedule.containsKey(day.getWeekDay())){
+                day.setId(currentSchedule.get(day.getWeekDay()).getId());
+            }
+            datesRepository.save(day);
+        });
     }
 
     private Map<String,Dates> getPersonDatesAsMap(PersonSchedule person){
@@ -32,22 +60,9 @@ public class ScheduleServiceImpl implements ScheduleService<PersonSchedulesDTO, 
                 .collect(
                         Collectors.toMap(
                                 Dates::getWeekDay,
-                                date -> date
+                                date -> date,
+                                (weekDay1,weekDay2) -> weekDay1
                         )
-                );
-    }
-
-    private void existDate(PersonSchedule person){
-        Optional<PersonSchedule> existPerson = personScheduleRepository.findById(person.getName());
-        Map<String,Dates> personDates = this.getPersonDatesAsMap(person);
-        existPerson.ifPresent(personPresent
-                        -> {
-                            personPresent.getDates().forEach(
-                                    date -> {
-                                        personDates.get(date.getWeekDay()).setId(date.getId());
-                                    }
-                            );
-                      }
                 );
     }
 
